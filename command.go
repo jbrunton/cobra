@@ -544,8 +544,9 @@ func (c *Command) SuggestionsTemplate() string {
 		return c.parent.SuggestionsTemplate()
 	}
 	return `
+
 Did you mean this?
-{{range .Suggestions}}{{print "\t" .}}{{end}}
+{{range .}}{{print "\t" .}}{{end}}
 `
 }
 
@@ -652,11 +653,6 @@ func (c *Command) Find(args []string) (*Command, []string, error) {
 	return commandFound, a, nil
 }
 
-type suggestionsContext struct {
-	Command     *Command
-	Suggestions []string
-}
-
 func (c *Command) findSuggestions(arg string) string {
 	if c.DisableSuggestions {
 		return ""
@@ -664,17 +660,14 @@ func (c *Command) findSuggestions(arg string) string {
 	if c.SuggestionsMinimumDistance <= 0 {
 		c.SuggestionsMinimumDistance = 2
 	}
-	// suggestionsString := ""
-	// if suggestions := c.SuggestionsFor(arg); len(suggestions) > 0 {
-	// 	suggestionsString += "\n\nDid you mean this?\n"
-	// 	for _, s := range suggestions {
-	// 		suggestionsString += fmt.Sprintf("\t%v\n", s)
-	// 	}
-	// }
-	var suggestionsBuffer bytes.Buffer
-	suggestions := c.SuggestionsFor(arg)
-	tmpl(&suggestionsBuffer, c.SuggestionsTemplate(), suggestionsContext{c, suggestions})
-	return suggestionsBuffer.String()
+	suggestionsString := ""
+	if suggestions := c.SuggestionsFor(arg); len(suggestions) > 0 {
+		var suggestionsBuffer bytes.Buffer
+		suggestions := c.SuggestionsFor(arg)
+		tmpl(&suggestionsBuffer, c.SuggestionsTemplate(), suggestions)
+		suggestionsString += suggestionsBuffer.String()
+	}
+	return suggestionsString
 }
 
 func (c *Command) findNext(next string) *Command {
