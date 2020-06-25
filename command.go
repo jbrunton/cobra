@@ -201,6 +201,8 @@ type Command struct {
 	helpCommand *Command
 	// versionTemplate is the version template defined by user.
 	versionTemplate string
+	// suggestionsTemplate is the suggestions template defined by user.
+	suggestionsTemplate string
 
 	// inReader is a reader defined by the user that replaces stdin
 	inReader io.Reader
@@ -282,6 +284,11 @@ func (c *Command) SetHelpTemplate(s string) {
 // SetVersionTemplate sets version template to be used. Application can use it to set custom template.
 func (c *Command) SetVersionTemplate(s string) {
 	c.versionTemplate = s
+}
+
+// SetSuggestionsTemplate sets suggestions template. Can be defined by Application.
+func (c *Command) SetSuggestionsTemplate(s string) {
+	c.suggestionsTemplate = s
 }
 
 // SetGlobalNormalizationFunc sets a normalization function to all flag sets and also to child commands.
@@ -527,6 +534,21 @@ func (c *Command) VersionTemplate() string {
 `
 }
 
+// SuggestionsTemplate return suggestions template for the command.
+func (c *Command) SuggestionsTemplate() string {
+	if c.suggestionsTemplate != "" {
+		return c.suggestionsTemplate
+	}
+
+	if c.HasParent() {
+		return c.parent.SuggestionsTemplate()
+	}
+	return `
+Did you mean this?
+{{range .Suggestions}}{{print "\t" .}}{{end}}
+`
+}
+
 func hasNoOptDefVal(name string, fs *flag.FlagSet) bool {
 	flag := fs.Lookup(name)
 	if flag == nil {
@@ -630,6 +652,11 @@ func (c *Command) Find(args []string) (*Command, []string, error) {
 	return commandFound, a, nil
 }
 
+type suggestionsContext struct {
+	Command     *Command
+	Suggestions []string
+}
+
 func (c *Command) findSuggestions(arg string) string {
 	if c.DisableSuggestions {
 		return ""
@@ -637,14 +664,17 @@ func (c *Command) findSuggestions(arg string) string {
 	if c.SuggestionsMinimumDistance <= 0 {
 		c.SuggestionsMinimumDistance = 2
 	}
-	suggestionsString := ""
-	if suggestions := c.SuggestionsFor(arg); len(suggestions) > 0 {
-		suggestionsString += "\n\nDid you mean this?\n"
-		for _, s := range suggestions {
-			suggestionsString += fmt.Sprintf("\t%v\n", s)
-		}
-	}
-	return suggestionsString
+	// suggestionsString := ""
+	// if suggestions := c.SuggestionsFor(arg); len(suggestions) > 0 {
+	// 	suggestionsString += "\n\nDid you mean this?\n"
+	// 	for _, s := range suggestions {
+	// 		suggestionsString += fmt.Sprintf("\t%v\n", s)
+	// 	}
+	// }
+	var suggestionsBuffer bytes.Buffer
+	suggestions := c.SuggestionsFor(arg)
+	tmpl(&suggestionsBuffer, c.SuggestionsTemplate(), suggestionsContext{c, suggestions})
+	return suggestionsBuffer.String()
 }
 
 func (c *Command) findNext(next string) *Command {
